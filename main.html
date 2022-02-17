@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <!-- adding the leaflet library -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin="" />
+        <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+        <!-- <script src="data.js"></script> -->
+
+        <!-- MarkerCluster Stuff -->
+        <link rel="stylesheet" href="./dist/MarkerCluster.css" />
+        <link rel="stylesheet" href="./dist/MarkerCluster.Default.css" />
+        <script src="./dist/leaflet.markercluster-src.js"></script>
+
+        <style>
+         #mapid {
+             height:600px;
+         }
+         /*#mapid {position: absolute; top: 0; bottom: 0; left: 0; right: 0;} /* making the map the size of the whole screen */
+        </style>
+    </head>
+
+    <body>
+
+        <h2> Choose the Dates You Want Permits From </h2>
+         <div class = "container"> 
+            <form onsubmit="GetDates(); return false;">
+                <label> From</label>
+                <input type = "date" id="FDate"> <br>
+                <label>To</label>
+                <input type = "date" id="TDate"> <br>
+                <input  class = "btn btn-primary" id="getDate" type="submit" value="Submit">
+            </form>
+        </div> 
+
+        <div id = "mapid"></div>
+
+        <script>
+
+            
+            var mymap = L.map('mapid').setView([51.0447, -114.0719],13);
+            const attribution = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
+            const tileUrl = 'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=HLg7lrdAi58LHXYFoAmw';
+            const tiles = L.tileLayer(tileUrl, { attribution});
+            tiles.addTo(mymap);
+
+            let calApi = 'https://data.calgary.ca/resource/c2es-76ed.geojson?$$app_token=LsCgAMajefqUpvGRQlkm2eXqJ';
+            var markers = L.markerClusterGroup(); 
+            let submitInput = document.querySelector('#SubmitB');
+
+            const btn = document.getElementById('getDate');
+            
+            let datein = '2020-02-19';
+            let dateout = '2020-02-22';
+            // let datein = document.getElementById('#FDate'); /* user entered from date is stored in datein */
+            // let dateout = document.getElementById('#TDate'); /* user entered to date is stored in dateout */
+
+            btn.addEventListener('click', function () 
+            {
+                if (markers.getLayers().length > 0) 
+                {
+                    markers.clearLayers();
+                    markers = L.markerClusterGroup();
+                }
+                console.log(datein);
+                console.log(dateout);
+                let link = `${calApi}&$where=issueddate%20%3E%20%27${datein}%27%20and%20issueddate%20%3C%20%27${dateout}%27&$select=issueddate,workclassgroup,contractorname,communityname,originaladdress,locationsgeojson`;
+                console.log(link);
+
+                fetch(link)
+                    .then(response => response.json())
+                    .then(data =>
+                    {
+                        console.log(data);
+                    
+                        for (const feature of data.features)
+                        {
+                            let geojson;
+
+                            if(feature.properties.locationsgeojson == null) continue;
+                            else
+                            {
+                                geojson = JSON.parse(feature.properties.locationsgeojson);
+
+                                if (geojson.type == 'Point')
+                                {
+                                    let marker = L.marker
+                                    ([
+                                        geojson.coordinates[1],
+                                        geojson.coordinates[0],
+                                    ]);
+
+                                    let issueddate = feature.properties.issueddate.substring
+                                    (
+                                        0, feature.properties.issueddate.indexOf('T')
+                                    );
+
+                                    let popCont = 'Issue Date:'+feature.properties.issueddate+ '<br></br>' + 'Work Class Group:'+feature.properties.workclassgroup+'<br></br>'+
+                                    'Contractor Name:'+feature.properties.contractorname + '<br></br>' + 'Community Name:' +feature.properties.communityname+'<br></br>'+
+                                    'Original Address:'+feature.properties.originaladdress
+
+                                    marker.bindPopup(popCont);
+                                    markers.addLayer(marker);
+                                }
+
+                                else if (geojson.type == 'MultiPoint')
+                                {
+                                    for (const point of geojson.coordinates)
+                                    {
+                                        let marker = L.marker(point[1], point[0]);
+                                        let issueddate = feature.properties.issueddate.substring
+                                        (
+                                        0, feature.properties.issueddate.indexOf('T')
+                                        );
+
+                                        let popCont = 'Issue Date:'+feature.properties.issueddate+ '<br></br>' + 'Work Class Group:'+feature.properties.workclassgroup+'<br></br>'+
+                                        'Contractor Name:'+feature.properties.contractorname + '<br></br>' + 'Community Name:' +feature.properties.communityname+'<br></br>'+
+                                        'Original Address:'+feature.properties.originaladdress
+
+                                        marker.bindPopup(popCont);
+                                        markers.addLayer(marker);
+                                    }
+                                }
+                            }
+                        }
+                        mymap.addLayer(markers);
+                    });
+            });
+
+            //submitInput.addEventListener("click",ReceiveDates); /*making the input it listen to click events */
+
+            // async function ReceiveDates() COULDEN'T FIGURE OUT HOW TO GET "L.GEOJSON" WORKING
+            // {
+            //     let datein = document.querySelector('#FDate').value; /* user entered from date is stored in datein */
+            //     let dateout = document.querySelector('#TDate').value; /* user entered to date is stored in dateout */
+                
+            //     //console.log(`datein=${datein}\ndateout=${dateout}`);
+               
+            //     let link = `${calApi}&$where=issueddate%20%3E%20%27${datein}%27%20and%20issueddate%20%3C%20%27${dateout}%27&$select=issueddate,workclassgroup,contractorname,communityname,originaladdress,locationsgeojson`;
+            //     const answer = await fetch(link); /* gets teh requested data */
+            //     let data = await answer.json(); /* makes the received data to json */
+            //     console.log(data);
+
+            //     /*var marker = L.markerClusterGroup(); */
+            //     const Geomark = L.geoJSON( data, { /*onEachFeature()*/
+            //         featureData : function(feature, layer) /* function to add the required info in a string */
+            //         {
+            //             var popCont = 'Issue Date:'+feature.properties.issueddate+ '<br></br>' + 'Work Class Group:'+feature.properties.workclassgroup+'<br></br>'+
+            //             'Contractor Name:'+feature.properties.contractorname + '<br></br>' + 'Community Name:' +feature.properties.communityname+'<br></br>'+
+            //             'Original Address:'+feature.properties.originaladdress
+            //             layer.bindPopup(popCont)
+            //             var marker = L.marker([data.])
+
+
+            //         },
+            //     });
+
+            //     markers.addLayer(Geomark); /* adds a layer to all the markers being placed */
+            //     mymap.addLayer(markers); /* adds the markers to the map layer */
+            // }
+
+
+            // var mymap = L.map('mapid').setView([51.0447, -114.0719],13);
+            // const attribution = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
+            // const tileUrl = 'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=HLg7lrdAi58LHXYFoAmw';
+            // const tiles = L.tileLayer(tileUrl, { attribution});
+            // tiles.addTo(mymap);
+
+            // var pop = L.popup();
+            // var pop = new L.Popup();
+            // var marker = L.markerClusterGroup();
+
+            /* ------------------Change Marker Icon, Add Shadow Youtube Tutorial----------------------------------------------------  */
+            /* var leafletIcon = L.icon ({
+                iconUrl: 'https://leafletjs.com/examples/custom-icons/leaf-green.png',
+                shadowUrl: 'https://leafletjs.com/examples/custom-icons/leaf-shadow.png',
+                iconSize: [38,95],
+                iconAnchor: [22,94], 
+                shadowAnchor: [4,62],
+                popupAnchor: [12,-90]
+            }) */
+            
+            /* ---------------------creating multiple icon defination ----------------------------------------------------------------- */
+            /* start by creating an icon class */
+            /*var LeafletIcon = L.Icon.extend({
+                options:{
+                    shadowUrl: 'https://leafletjs.com/examples/custom-icons/leaf-shadow.png',
+                    iconSize: [38,95],
+                    shadowSize: [50,64],
+                    iconAnchor: [22,94],
+                    shadowAnchor: [4,62],
+                    popupAnchor: [-3,-76]
+                }
+            })
+            
+            var greenIcon = new LeafletIcon({iconUrl:'https://leafletjs.com/examples/custom-icons/leaf-green.png'}),
+                redIcon = new LeafletIcon({iconUrl:'https://leafletjs.com/examples/custom-icons/leaf-red.png'}),
+                orangeIcon = new LeafletIcon({iconUrl:'https://leafletjs.com/examples/custom-icons/leaf-orange.png'})
+                
+
+
+            var marker = L.marker([51.5, -0.08],{icon:greenIcon}).addTo(mymap); /* adds a market to that lat & long */
+            /*var marker = L.marker([51.5, -0.09],{icon:redIcon}).addTo(mymap);
+            var marker = L.marker([51.5, -0.10],{icon:orangeIcon}).addTo(mymap);
+
+            /* ------------------Creating Circles, Polygons, and Popups-------------------------------------  */
+            /* Adding Circle */
+            //     var circle = L.circle([51.508,-0.11],{   /* second argument in circle is radius in meters */
+            //         color: 'red', fillColor: '#f03', fillOpacity: 0.5, radius: 500
+            //     }).addTo(mymap);
+
+            //     /* Adding Polygon */
+            //     var polygon = L.polygon([ /* just list all the points that you want polygon to connect to */
+            //         [51.509, -0.08],
+            //         [51.503, -0.06],
+            //         [51.51, -0.047]
+            //     ]). addTo(mymap);
+
+            //     /* Adding Popups: usually used to attach a particular info to an object on the map */
+            //    /* marker.bindPopup("<b> Hey There! </b><br> I am a marker.").openPopup(); */
+            //     circle.bindPopup("I am a circle");
+            //     polygon.bindPopup("I am a polygon");
+        </script>
+
+
+    </body>
+
+
+
+
+</html>
+
+
+
