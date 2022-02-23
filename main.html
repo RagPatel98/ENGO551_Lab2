@@ -29,7 +29,8 @@
                 <input type = "date" id="FDate"> <br>
                 <label>To</label>
                 <input type = "date" id="TDate"> <br>
-                <input  class = "btn btn-primary" id="getDate" type="submit" value="Submit">
+                <input  class = "btn btn-primary" id="getDate" value="Submit">
+                <input  class = "btn btn-primary" id="layer" value="Traffic Accidents">
             </form>
         </div> 
 
@@ -37,23 +38,47 @@
 
         <script>
 
-            
             var mymap = L.map('mapid').setView([51.0447, -114.0719],13);
             const attribution = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
-            const tileUrl = 'https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=HLg7lrdAi58LHXYFoAmw';
-            const tiles = L.tileLayer(tileUrl, { attribution});
+            const tiles = L.tileLayer(
+                'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}',
+                {
+                  attribution: attribution,
+                  maxZoom: 18,
+                  id: 'mapbox/streets-v11',
+                  tileSize: 512,
+                  zoomOffset: -1,
+                  accessToken:
+                    'pk.eyJ1IjoicmFncGF0ZWw5OCIsImEiOiJja3p5cGowa2kwMHV5M3BwYjgyb2FpN3JpIn0.F65b8PW3MtUrylJjPTy6BQ',
+                }
+            );
             tiles.addTo(mymap);
+
+            const trafficTiles = L.tileLayer(
+                'https://api.mapbox.com/styles/v1/ragpatel98/ckzytmjar006l14p787y6wgl1/tiles/{z}/{x}/{y}?access_token={accessToken}',
+                {
+                  attribution:attribution,
+                  maxZoom: 18,
+                  tileSize: 512,
+                  zoomOffset: -1,
+                  accessToken:
+                    'pk.eyJ1IjoicmFncGF0ZWw5OCIsImEiOiJja3p5cGowa2kwMHV5M3BwYjgyb2FpN3JpIn0.F65b8PW3MtUrylJjPTy6BQ',
+                }
+            );
+
 
             let calApi = 'https://data.calgary.ca/resource/c2es-76ed.geojson?$$app_token=LsCgAMajefqUpvGRQlkm2eXqJ';
             var markers = L.markerClusterGroup(); 
             let submitInput = document.querySelector('#SubmitB');
 
             const btn = document.getElementById('getDate');
-            
+            const layer = document.getElementById('layer');
+            let layerOn = false;
+
             let datein = '2020-02-19';
             let dateout = '2020-02-22';
-            // let datein = document.getElementById('#FDate'); /* user entered from date is stored in datein */
-            // let dateout = document.getElementById('#TDate'); /* user entered to date is stored in dateout */
+            //let datein = document.getElementById('#FDate'); /* user entered from date is stored in datein */
+            //let dateout = document.getElementById('#TDate'); /* user entered to date is stored in dateout */
 
             btn.addEventListener('click', function () 
             {
@@ -62,70 +87,69 @@
                     markers.clearLayers();
                     markers = L.markerClusterGroup();
                 }
-                console.log(datein);
-                console.log(dateout);
+                //console.log(datein);
+                //console.log(dateout);
                 let link = `${calApi}&$where=issueddate%20%3E%20%27${datein}%27%20and%20issueddate%20%3C%20%27${dateout}%27&$select=issueddate,workclassgroup,contractorname,communityname,originaladdress,locationsgeojson`;
-                console.log(link);
+                //console.log(link);
 
-                fetch(link)
+                fetch(url)
                     .then(response => response.json())
                     .then(data =>
                     {
-                        console.log(data);
-                    
-                        for (const feature of data.features)
-                        {
-                            let geojson;
+                        //console.log(data);
+                        for (const feature of data.features) {
+                    if (feature.properties.locationsgeojson === null) continue;
+                    else {
+                      let geojson = JSON.parse(feature.properties.locationsgeojson);
 
-                            if(feature.properties.locationsgeojson == null) continue;
-                            else
-                            {
-                                geojson = JSON.parse(feature.properties.locationsgeojson);
+                      if (geojson.type === 'Point') {
+                        let marker = L.marker([
+                          geojson.coordinates[1],
+                          geojson.coordinates[0],
+                        ]);
+                        marker.bindPopup(
+                          `<p>Date Issued: ${feature.properties.issueddate.substring(
+                            0,
+                            feature.properties.issueddate.indexOf('T')
+                          )}</p> 
+                            <p>Class Group: ${feature.properties.workclassgroup}</p>
+                            <p>Contractor: ${feature.properties.contractorname}</p>
+                            <p>Community: ${feature.properties.communityname}</p>
+                            <p>Address: ${feature.properties.originaladdress}</p>`
+                        );
+                        markers.addLayer(marker);
+                      } else if (geojson.type === 'MultiPoint') {
+                        for (const point of geojson.coordinates) {
+                          let marker = L.marker([point[1], point[0]]);
 
-                                if (geojson.type == 'Point')
-                                {
-                                    let marker = L.marker
-                                    ([
-                                        geojson.coordinates[1],
-                                        geojson.coordinates[0],
-                                    ]);
-
-                                    let issueddate = feature.properties.issueddate.substring
-                                    (
-                                        0, feature.properties.issueddate.indexOf('T')
-                                    );
-
-                                    let popCont = 'Issue Date:'+feature.properties.issueddate+ '<br></br>' + 'Work Class Group:'+feature.properties.workclassgroup+'<br></br>'+
-                                    'Contractor Name:'+feature.properties.contractorname + '<br></br>' + 'Community Name:' +feature.properties.communityname+'<br></br>'+
-                                    'Original Address:'+feature.properties.originaladdress
-
-                                    marker.bindPopup(popCont);
-                                    markers.addLayer(marker);
-                                }
-
-                                else if (geojson.type == 'MultiPoint')
-                                {
-                                    for (const point of geojson.coordinates)
-                                    {
-                                        let marker = L.marker(point[1], point[0]);
-                                        let issueddate = feature.properties.issueddate.substring
-                                        (
-                                        0, feature.properties.issueddate.indexOf('T')
-                                        );
-
-                                        let popCont = 'Issue Date:'+feature.properties.issueddate+ '<br></br>' + 'Work Class Group:'+feature.properties.workclassgroup+'<br></br>'+
-                                        'Contractor Name:'+feature.properties.contractorname + '<br></br>' + 'Community Name:' +feature.properties.communityname+'<br></br>'+
-                                        'Original Address:'+feature.properties.originaladdress
-
-                                        marker.bindPopup(popCont);
-                                        markers.addLayer(marker);
-                                    }
-                                }
-                            }
+                          marker.bindPopup(
+                            `<p>Date Issued: ${feature.properties.issueddate.substring(
+                              0,
+                              feature.properties.issueddate.indexOf('T')
+                            )}</p> 
+                                <p>Class Group: ${feature.properties.workclassgroup}</p>
+                                <p>Contractor: ${feature.properties.contractorname}</p>
+                                <p>Community: ${feature.properties.communityname}</p>
+                                <p>Address: ${feature.properties.originaladdress}</p>`
+                          );
+                          markers.addLayer(marker);
                         }
-                        mymap.addLayer(markers);
-                    });
+                      }
+                    }
+                  }
+                  mymap.addLayer(markers);
+                });
             });
+
+            layer.addEventListener('click', function () {
+              if (!layerOn) {
+                trafficTiles.addTo(mymap);
+                layerOn = true;
+              } else {
+                trafficTiles.removeFrom(mymap);
+                layerOn = false;
+              }
+            })
 
             //submitInput.addEventListener("click",ReceiveDates); /*making the input it listen to click events */
 
